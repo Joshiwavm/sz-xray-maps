@@ -1,0 +1,38 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# macOS
+.DS_Store
+
+# Data files — FITS, HDF5, large arrays
+*.fits
+*.fits.gz
+*.fts
+*.h5
+*.hdf5
+
+# Plots output
+plots/
+
+# Editor
+.vscode/
+.idea/
+*.swp
