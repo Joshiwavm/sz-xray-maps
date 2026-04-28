@@ -76,6 +76,7 @@ class ThermoProcessor:
             mask=mask,
             z=self.z,
             kT=self.kT,
+            cluster_tag=self.cluster_tag,
             metallicity=self.metallicity,
             energy_range=xr_entry.get("energy_range"),
             seed=seed,
@@ -85,14 +86,16 @@ class ThermoProcessor:
         l_mean = round(float(np.mean(samples)))
         l_std  = round(float(np.std(samples)))
         self.l_eff = l_mean * u.kpc
-        r500  = self._r500()
-        ratio = r500 / self.l_eff
-        C     = float(np.sqrt(ratio.decompose().value))
+        r500       = self._r500()
+        ratio      = float((r500 / self.l_eff).decompose().value)
+        ratio_std  = ratio * (l_std / l_mean)
+        C          = float(np.sqrt(ratio))
+        C_std      = 0.5 * ratio_std / C
         print(
             f"l_eff = {l_mean} ± {l_std} kpc  |  "
             f"r500,c = {r500.value:.0f} kpc  |  "
-            f"r500,c / l_eff = {ratio.decompose().value:.3f}  |  "
-            f"C = {C:.3f}"
+            f"r500,c / l_eff = {ratio:.3f} ± {ratio_std:.3f}  |  "
+            f"C = {C:.3f} ± {C_std:.3f}"
         )
         return self
 
@@ -158,6 +161,7 @@ class ThermoProcessor:
             z=self.z,
             kT=kT_val,
             mask=mask,
+            cluster_tag=self.cluster_tag,
             metallicity=self.metallicity,
         )
         self.calib_factors[target_label] = factor
@@ -233,7 +237,9 @@ class ThermoProcessor:
                 entry["data"] - (entry["background"] or 0.0),
                 entry["instrument"].ecf, self.z, l_eff, self.kT,
                 entry.get("pixel_area_sr", self.pixel_area_sr),
-                metallicity=self.metallicity, energy_range=entry.get("energy_range"),
+                cluster_tag=self.cluster_tag,
+                metallicity=self.metallicity,
+                energy_range=entry.get("energy_range"),
             ) / calib
 
             T_e = ClusterPhysics.temperature(P_e, n_e)
@@ -271,11 +277,11 @@ class ThermoProcessor:
             for qty, bunit in _bunits.items():
                 data = th[qty].value.astype(np.float32)
                 hdr  = wcs_hdr.copy()
-                hdr["BUNIT"]   = bunit
+                hdr["BUNIT"]    = bunit
                 hdr["INSTRUME"] = lbl
                 hdr["QUANTITY"] = qty
+                hdr["CLUSTER"]  = self.cluster_tag
                 hdu  = fits.PrimaryHDU(data=data, header=hdr)
-                path = os.path.join(output_dir, f"{lbl}_{qty}.fits")
+                path = os.path.join(output_dir, f"{self.cluster_tag}_{lbl}_{qty}.fits")
                 hdu.writeto(path, overwrite=True)
                 print(f"Saved {path}")
-

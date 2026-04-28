@@ -29,6 +29,10 @@ env/
 *.h5
 *.hdf5
 
+# Cooling function tables — generated at runtime by Manager, not tracked in git
+SZ_xray_maps/cooling_function/*.npz
+SZ_xray_maps/data/
+
 # Plots output
 plots/
 

@@ -40,6 +40,7 @@ class LeffSolver:
         mask: np.ndarray,
         z: float,
         kT: u.Quantity,
+        cluster_tag: str,
         metallicity: float,
         energy_range: tuple[float, float] | None,
     ) -> float:
@@ -48,7 +49,7 @@ class LeffSolver:
         P_e = ClusterPhysics.pressure(compton_y, l_eff)
         n_e = ClusterPhysics.density(
             xray_map, xray_ecf, z, l_eff, kT, pixel_area_sr,
-            metallicity=metallicity, energy_range=energy_range,
+            cluster_tag=cluster_tag, metallicity=metallicity, energy_range=energy_range,
         )
         T_e = ClusterPhysics.temperature(P_e, n_e)
         return float(np.nanmedian(T_e[mask].value))
@@ -63,6 +64,7 @@ class LeffSolver:
         mask: np.ndarray,
         z: float,
         kT: u.Quantity,
+        cluster_tag: str = "",
         metallicity: float = 0.37,
         energy_range: tuple[float, float] | None = None,
         lmin: float = 1.0,
@@ -70,7 +72,8 @@ class LeffSolver:
     ) -> float:
         """Find the uniform l_eff [kpc] that reproduces *T_target* [keV]."""
         f = lambda l: LeffSolver._median_temperature(
-            l, compton_y, xray_map, xray_ecf, pixel_area_sr, mask, z, kT, metallicity, energy_range,
+            l, compton_y, xray_map, xray_ecf, pixel_area_sr, mask, z, kT,
+            cluster_tag, metallicity, energy_range,
         ) - T_target
         return brentq(f, lmin, lmax)
 
@@ -86,6 +89,7 @@ class LeffSolver:
         mask: np.ndarray,
         z: float,
         kT: u.Quantity,
+        cluster_tag: str = "",
         metallicity: float = 0.37,
         energy_range: tuple[float, float] | None = None,
         seed: int | None = None,
@@ -97,7 +101,7 @@ class LeffSolver:
         return np.array([
             LeffSolver.solve_uniform(
                 T, compton_y, xray_map, xray_ecf, pixel_area_sr, mask, z, kT,
-                metallicity=metallicity, energy_range=energy_range,
+                cluster_tag=cluster_tag, metallicity=metallicity, energy_range=energy_range,
             )
             for T in T_samples
         ])

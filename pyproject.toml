@@ -28,6 +28,7 @@ dependencies = [
     "astropy>=5.3",
     "reproject>=0.11",
     "matplotlib>=3.7",
+    "pyatomdb>=0.10",
 ]
 
 [project.optional-dependencies]
@@ -41,9 +42,7 @@ include = ["SZ_xray_maps*"]
 
 [tool.setuptools.package-data]
 "SZ_xray_maps" = [
-    "data/*.npz",
     "data/*.txt",
-    "data/cooling_function/*.npz",
     "plot/*.txt",
     "plot/*.mplstyle",
 ]

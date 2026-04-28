@@ -8,6 +8,11 @@ from .loading.base import Loader
 from .thermo.base import ThermoProcessor
 from .thermo.error_propagation import ErrorPropagator
 from .plot.base import Plotter
+from .cooling_function import generate_bins
+from .cooling_function.generator import DEFAULT_EBINS, DEFAULT_TLIST
+from pathlib import Path
+
+_COOLING_DIR = Path(__file__).parent / "cooling_function"
 
 
 class Manager(Loader, ThermoProcessor, ErrorPropagator, Plotter):
@@ -15,6 +20,7 @@ class Manager(Loader, ThermoProcessor, ErrorPropagator, Plotter):
 
     def __init__(
         self,
+        cluster_tag: str,
         size_arcmin: float = 2.0,
         center: tuple[float, float] | None = None,
         z: float | None = None,
@@ -27,6 +33,7 @@ class Manager(Loader, ThermoProcessor, ErrorPropagator, Plotter):
         self._handler      = None   # set on first add_sz call
         self._size_arcmin  = size_arcmin
         self._center       = center
+        self.cluster_tag   = cluster_tag
         self.z             = z
         self.M500          = M500
         self.pixel_area_sr = None
@@ -37,6 +44,19 @@ class Manager(Loader, ThermoProcessor, ErrorPropagator, Plotter):
         Loader.__init__(self)
         ThermoProcessor.__init__(self)
         Plotter.__init__(self)
+
+        self._ensure_cooling_function()
+
+    def _ensure_cooling_function(self) -> None:
+        """Generate per-bin cooling function tables if not already on disk."""
+        generate_bins(
+            cluster_tag=self.cluster_tag,
+            z=self.z,
+            metallicity=self.metallicity,
+            output_dir=_COOLING_DIR,
+            ebins=DEFAULT_EBINS,
+            tlist=DEFAULT_TLIST,
+        )
 
     # ------------------------------------------------------------------
     # Reference WCS

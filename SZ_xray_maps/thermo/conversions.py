@@ -9,8 +9,7 @@ from scipy import interpolate
 from astropy import units as u
 import astropy.constants as const
 
-_DATA_DIR    = Path(__file__).parent.parent / "data"
-_BIN_DIR     = _DATA_DIR / "cooling_function"
+_BIN_DIR     = Path(__file__).parent.parent / "cooling_function"
 
 _NE_NH_RATIO = 1.2
 
@@ -20,6 +19,7 @@ _BIN_PATTERN = re.compile(r"(\d+\.\d+)-(\d+\.\d+)keV\.npz$")
 
 
 def _build_cooling_fn(
+    cluster_tag: str,
     metallicity: float,
     energy_range: tuple[float, float],
 ) -> interpolate.interp1d:
@@ -28,10 +28,10 @@ def _build_cooling_fn(
     Sums per-bin files whose energy ranges overlap *energy_range*.
     Each file stores Λ already integrated over its bin — no ΔE factor needed.
     """
-    emin, emax   = energy_range
-    temperature  = None
-    total_power  = None
-    glob_pat     = f"cooling_function_*{metallicity:.2f}solar*.npz"
+    emin, emax  = energy_range
+    temperature = None
+    total_power = None
+    glob_pat    = f"cooling_function_{cluster_tag}_{metallicity:.2f}solar*.npz"
 
     for fpath in sorted(_BIN_DIR.glob(glob_pat)):
         m = _BIN_PATTERN.search(fpath.name)
@@ -49,22 +49,24 @@ def _build_cooling_fn(
 
     if total_power is None:
         raise FileNotFoundError(
-            f"No per-bin cooling-function files found for metallicity={metallicity:.2f} "
-            f"solar in energy range {energy_range} keV under {_BIN_DIR}."
+            f"No per-bin cooling-function files found for cluster={cluster_tag}, "
+            f"metallicity={metallicity:.2f} solar in energy range {energy_range} keV "
+            f"under {_BIN_DIR}."
         )
     return interpolate.interp1d(temperature, total_power, kind="linear")
 
 
 def _cooling_lambda(
     kT: u.Quantity,
+    cluster_tag: str,
     metallicity: float,
     energy_range: tuple[float, float],
 ) -> u.Quantity:
     """Evaluate the cooling function at ``kT`` with explicit astropy units."""
-    lam_fn = _build_cooling_fn(metallicity, energy_range)
+    lam_fn = _build_cooling_fn(cluster_tag, metallicity, energy_range)
     T_K = (kT / const.k_B).to(u.K).value
     return lam_fn(T_K) * u.erg * u.cm**3 / u.s
-    
+
 
 class ClusterPhysics:
     """Static thermodynamic conversions for a galaxy cluster ICM."""
@@ -84,6 +86,7 @@ class ClusterPhysics:
         l_eff: u.Quantity,
         kT: u.Quantity,
         pixel_area_sr: u.Quantity,
+        cluster_tag: str = "",
         metallicity: float = 0.37,
         energy_range: tuple[float, float] | None = None,
     ) -> u.Quantity:
@@ -93,9 +96,9 @@ class ClusterPhysics:
         pixel solid angle, then inverts:
             ne² = 1.2 · 4π sr · (1+z)⁴ · S_X / (Λ · l_eff)
         """
-        S_X = counts_map * u.ct / u.s * ecf / pixel_area_sr  # erg/cm²/s/sr
-        lam = _cooling_lambda(kT, metallicity, energy_range)
-        n_e_sq = _NE_NH_RATIO * 4 * np.pi * (1 + z)**4 * S_X / lam  * u.sr
+        S_X    = counts_map * u.ct / u.s * ecf / pixel_area_sr  # erg/cm²/s/sr
+        lam    = _cooling_lambda(kT, cluster_tag, metallicity, energy_range)
+        n_e_sq = _NE_NH_RATIO * 4 * np.pi * (1 + z)**4 * S_X / lam * u.sr
 
         with np.errstate(invalid="ignore"):  # negative pixels → NaN, expected
             return np.sqrt(n_e_sq / l_eff).to(u.cm**-3)
@@ -125,6 +128,7 @@ class ClusterPhysics:
         z: float,
         kT: u.Quantity,
         mask: np.ndarray,
+        cluster_tag: str = "",
         metallicity: float = 0.37,
     ) -> float:
         """Multiplicative factor to rescale target density so median T matches reference.
@@ -135,10 +139,14 @@ class ClusterPhysics:
             T_calibrated = P_e / (n_tgt / factor) = T_tgt × factor → median = T_ref
         """
         P_e   = ClusterPhysics.pressure(compton_y, l_eff)
-        n_ref = ClusterPhysics.density(ref_map, ref_ecf, z, l_eff, kT, ref_pixel_area_sr,
-                                       metallicity=metallicity, energy_range=ref_energy_range)
-        n_tgt = ClusterPhysics.density(tgt_map, tgt_ecf, z, l_eff, kT, tgt_pixel_area_sr,
-                                       metallicity=metallicity, energy_range=tgt_energy_range)
+        n_ref = ClusterPhysics.density(
+            ref_map, ref_ecf, z, l_eff, kT, ref_pixel_area_sr,
+            cluster_tag=cluster_tag, metallicity=metallicity, energy_range=ref_energy_range,
+        )
+        n_tgt = ClusterPhysics.density(
+            tgt_map, tgt_ecf, z, l_eff, kT, tgt_pixel_area_sr,
+            cluster_tag=cluster_tag, metallicity=metallicity, energy_range=tgt_energy_range,
+        )
         T_ref = ClusterPhysics.temperature(P_e, n_ref)[mask].value
         T_tgt = ClusterPhysics.temperature(P_e, n_tgt)[mask].value
         T_ref = T_ref[np.isfinite(T_ref)]
