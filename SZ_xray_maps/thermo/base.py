@@ -128,7 +128,7 @@ class ThermoProcessor:
         ref_label: str,
         target_label: str,
         sz_label: str,
-        radius_arcsec: float = 10.0,
+        radius_arcsec: float | None = None,
         l_eff: u.Quantity | None = None,
     ) -> "Manager":
         """Cross-calibrate *target_label* against *ref_label* by matching median temperatures.
@@ -137,13 +137,22 @@ class ThermoProcessor:
         then stores ``calib_factors[target_label] = median(T_ref) / median(T_target)``.
         In ``compute_thermo``, Chandra density is divided by this factor so that
         T_calibrated = T_target * factor → median(T_target_calibrated) = median(T_ref).
+
+        If *radius_arcsec* is None (default), reuses the mask already set by
+        ``compute_leff_uniform`` so calibration and l_eff estimation share the same aperture.
         """
         l_eff  = l_eff if l_eff is not None else (self.l_eff if self.l_eff is not None else self.l_eff_map)
         kT_val = self.kT
 
         ref = self.xray_maps[ref_label]
         tgt = self.xray_maps[target_label]
-        self.calib_mask = self._make_calib_mask(radius_arcsec, ref["data"].shape)
+        if radius_arcsec is not None:
+            self.calib_mask = self._make_calib_mask(radius_arcsec, ref["data"].shape)
+        elif self.calib_mask is None:
+            raise ValueError(
+                "No calibration mask available. Call compute_leff_uniform first "
+                "or pass radius_arcsec explicitly."
+            )
         mask = self.calib_mask
 
         compton_y = self.sz_maps[sz_label]["compton_y"]
@@ -175,12 +184,12 @@ class ThermoProcessor:
     # Diagnostics
     # ------------------------------------------------------------------
 
-    def diagnostics(self, sz_label: str = "band3") -> None:
-        """Print a summary of key thermo results within the calibration mask."""
-        mask = self.calib_mask
-
+    def diagnostics(self, sz_label: str = "band3", snr_mask_threshold: float = -4.0) -> None:
+        """Print a summary of key thermo results within the SZ-detected region."""
         snr = self.sz_maps[sz_label]["snr"]
-        print(f"S/N {sz_label} peak:  {np.nanmin(snr):.0f} σ")
+        snr_mask = snr < snr_mask_threshold   # pixels with significant SZ detection
+        print(f"S/N {sz_label} peak:  {np.nanmin(snr):.0f} σ  "
+              f"({np.sum(snr_mask)} pixels above {abs(snr_mask_threshold):.0f} σ)")
 
         r500 = self._r500()
         if self.l_eff is not None:
@@ -204,13 +213,31 @@ class ThermoProcessor:
                 print(f"calib_factor[{lbl}] = {f:.4f}")
 
         for lbl, th in self.thermo.items():
-            T = th["T_e"][mask]
-            n = th["n_e"][mask]
+            T_map = np.where(snr_mask, th["T_e"].value, np.nan)
+            n_map = np.where(snr_mask, th["n_e"].value, np.nan)
+            snr_T = self.snr.get(lbl, {}).get("T_e")
+
+            # Peak: only consider pixels with a reliable T_e SNR
+            if snr_T is not None:
+                reliable = snr_mask & (snr_T > 3.0)
+                T_reliable = np.where(reliable, th["T_e"].value, np.nan)
+                peak_idx   = np.nanargmax(T_reliable)
+                T_peak_val = T_reliable.flat[peak_idx]
+                T_peak_err = T_peak_val / abs(snr_T.flat[peak_idx])
+                peak_str   = f"{T_peak_val:.1f} ± {T_peak_err:.1f} keV"
+            else:
+                peak_idx   = np.nanargmax(T_map)
+                T_peak_val = T_map.flat[peak_idx]
+                peak_str   = f"{T_peak_val:.1f} keV"
+
+            T_median_val = (np.nanmedian(th["T_e"].value[self.calib_mask])
+                            if self.calib_mask is not None
+                            else np.nanmedian(T_map))
             print(
                 f"{lbl:12s}  "
-                f"T_e median = {np.nanmedian(T.value):.1f} keV  "
-                f"T_e peak = {np.nanmax(T.value):.1f} keV  "
-                f"n_e median = {np.nanmedian(n.value)*1e3:.2f} ×10⁻³ cm⁻³"
+                f"T_e median = {T_median_val:.1f} keV  "
+                f"T_e peak = {peak_str}  "
+                f"n_e median = {np.nanmedian(n_map)*1e3:.2f} ×10⁻³ cm⁻³"
             )
 
     # ------------------------------------------------------------------

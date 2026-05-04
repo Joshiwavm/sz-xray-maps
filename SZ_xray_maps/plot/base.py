@@ -32,13 +32,13 @@ class Plotter:
         "compton_y":   ("planck",  1e4,  r"Compton-$y$ [×10$^{-4}$]",                  -0.2,  None),
         "P_e":         ("planck",  1e3,  r"$\bar{P}_e$ [keV cm$^{-3}$ ×10$^{-3}$]",   -20.0,  None),
         "n_e":         ("inferno", 1e3,  r"$\bar{n}_e$ [cm$^{-3}$ ×10$^{-3}$]",         0.0,  10),
-        "T_e":         ("magma",   1.0,  r"$\bar{T}_e$ [keV]",                          0.0,  14),
+        "T_e":         ("magma",   1.0,  r"$k_{\rm b}\bar{T}_e$ [keV]",                          0.0,  13),
         "K_e":         ("cividis", 1e-3, r"$\bar{K}_e$ [keV cm$^2$ ×10$^{-3}$]",        0.0,  0.5),
         # SNR maps (quantity / σ_quantity)
         "snr_compton_y": ("viridis", 1.0,  r"SNR Compton-$y$",   0.0, None),
         "snr_P_e":       ("viridis", 1.0,  r"SNR $\bar{P}_e$",   0.0, None),
         "snr_n_e":       ("viridis", 1.0,  r"SNR $\bar{n}_e$",   0.0, 5),
-        "snr_T_e":       ("viridis", 1.0,  r"SNR $\bar{T}_e$",   0.0, 5),
+        "snr_T_e":       ("viridis", 1.0,  r"SNR $k_{\rm b}\bar{T}_e$",   0.0, 5),
         "snr_K_e":       ("viridis", 1.0,  r"SNR $\bar{K}_e$",   0.0, 5),
     }
 
@@ -343,9 +343,11 @@ class Plotter:
         P_panel = _panel("P_e", th0["P_e"].value * 1e3)
         P_panel["vmax"] = P_panel["vmax"] or np.nanmax(th0["P_e"].value * 1e3)
 
+        _display_names = {"chandra": "Chandra", "xmm": "XMM-Newton"}
+
         def _instrument_panels(lbl, show_label):
             th   = self.thermo[lbl]
-            name = lbl if show_label else None
+            name = _display_names.get(lbl, lbl) if show_label else None
             return [
                 {**_panel("n_e", _masked(th["n_e"].value * 1e3), label=name),
                  "xray_label": lbl, "quantity": "n_e"},
@@ -385,9 +387,11 @@ class Plotter:
         snr0    = self.snr[xray_labels[0]]
         P_panel = _panel("P_e", _masked(snr0["P_e"]))
 
+        _display_names = {"chandra": "Chandra", "xmm": "XMM-Newton"}
+
         def _instrument_panels(lbl, show_label):
             s    = self.snr[lbl]
-            name = lbl if show_label else None
+            name = _display_names.get(lbl, lbl) if show_label else None
             return [
                 _panel("n_e", _masked(s["n_e"]), label=name),
                 _panel("T_e", _masked(s["T_e"])),

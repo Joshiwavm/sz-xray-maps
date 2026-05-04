@@ -46,11 +46,14 @@ Cooling function tables for this cluster are generated automatically on first ru
 # First SZ call sets the reference WCS
 mgr.add_sz("band3.fits", ALMA(92e9), label="band3")
 
-mgr.add_xray("chandra.fits", Chandra(), label="chandra",
-             smooth_fwhm_arcsec=4.5, expmap_path="expmap.fits",
+# Pass rmf/arf + z/T_keV to compute ECF from XSPEC; omit for hardcoded fallback
+mgr.add_xray("chandra.fits",
+             Chandra(rmf="spec.rmf", arf="spec.arf", z=1.71, T_keV=7.2),
+             label="chandra", smooth_fwhm_arcsec=4.5, expmap_path="expmap.fits",
              energy_range=(0.5, 2.0))
-mgr.add_xray("xmm.fits", XMM(), label="xmm",
-             smooth_fwhm_arcsec=6.0, energy_range=(0.4, 4.0))
+mgr.add_xray("xmm.fits",
+             XMM(rmf="xmm.rmf", arf="xmm.arf", z=1.71, T_keV=7.2),
+             label="xmm", smooth_fwhm_arcsec=6.0, energy_range=(0.4, 4.0))
 ```
 
 ### 3. Compton-y and background
@@ -86,8 +89,7 @@ The uniform result also returns the shape factor `C = sqrt(r500 / l_eff)`, which
 Cross-calibrate a second instrument against a reference by matching the median projected temperature within an aperture:
 
 ```python
-mgr.calibrate_xray(ref_label="xmm", target_label="chandra",
-                   sz_label="band3", radius_arcsec=20)
+mgr.calibrate_xray(ref_label="xmm", target_label="chandra", sz_label="band3")
 ```
 
 ### 6. Thermodynamic maps
@@ -121,7 +123,7 @@ FITS files are saved as `{cluster_tag}_{instrument}_{quantity}.fits`.
 
 **X-ray:** Chandra ACIS-I (0.5–2 keV), XMM-Newton EPIC MOS thin (0.4–4 keV)
 
-To add a new instrument, subclass `SZInstrument` or `XRayInstrument` and provide an ECF derived from PIMMS for the appropriate band, spectral model, redshift, and Galactic N_H.
+To add a new instrument, subclass `SZInstrument` or `XRayInstrument`. The ECF is computed automatically from XSPEC ARF/RMF files if they are provided; otherwise supply a hardcoded fallback value (e.g. from PIMMS) for the appropriate band, spectral model, redshift, and Galactic N_H.
 
 ## Cooling function
 
