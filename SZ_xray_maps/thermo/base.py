@@ -283,8 +283,16 @@ class ThermoProcessor:
         self,
         output_dir: str,
         xray_labels: list[str] | None = None,
+        include_snr: bool = False,
+        include_noise: bool = False,
     ) -> None:
-        """Write thermodynamical maps to FITS files with subimage WCS headers."""
+        """Write thermodynamical maps to FITS files with subimage WCS headers.
+
+        include_snr   – also write S/N maps (dimensionless, suffix ``_snr``)
+        include_noise – also write absolute-error maps in the same units as the
+                        quantity (suffix ``_noise``); requires errors to have
+                        been computed via ``compute_errors``.
+        """
         import os
         from astropy.io import fits
 
@@ -301,14 +309,32 @@ class ThermoProcessor:
         labels = xray_labels or list(self.thermo.keys())
         for lbl in labels:
             th = self.thermo[lbl]
+
+            if (include_snr or include_noise) and lbl not in self.snr:
+                raise ValueError(
+                    f"S/N maps for '{lbl}' not found — run compute_errors() first."
+                )
+
             for qty, bunit in _bunits.items():
-                data = th[qty].value.astype(np.float32)
-                hdr  = wcs_hdr.copy()
-                hdr["BUNIT"]    = bunit
-                hdr["INSTRUME"] = lbl
-                hdr["QUANTITY"] = qty
-                hdr["CLUSTER"]  = self.cluster_tag
-                hdu  = fits.PrimaryHDU(data=data, header=hdr)
-                path = os.path.join(output_dir, f"{self.cluster_tag}_{lbl}_{qty}.fits")
-                hdu.writeto(path, overwrite=True)
-                print(f"Saved {path}")
+                def _write(data: np.ndarray, suffix: str, bunit_override: str) -> None:
+                    hdr = wcs_hdr.copy()
+                    hdr["BUNIT"]    = bunit_override
+                    hdr["INSTRUME"] = lbl
+                    hdr["QUANTITY"] = qty
+                    hdr["CLUSTER"]  = self.cluster_tag
+                    hdu  = fits.PrimaryHDU(data=data.astype(np.float32), header=hdr)
+                    path = os.path.join(
+                        output_dir,
+                        f"{self.cluster_tag}_{lbl}_{qty}{suffix}.fits",
+                    )
+                    hdu.writeto(path, overwrite=True)
+                    print(f"Saved {path}")
+
+                _write(th[qty].value, "", bunit)
+
+                if include_snr or include_noise:
+                    snr_arr = self.snr[lbl][qty]
+                    if include_snr:
+                        _write(snr_arr, "_snr", "")
+                    if include_noise:
+                        _write(th[qty].value / snr_arr, "_noise", bunit)
