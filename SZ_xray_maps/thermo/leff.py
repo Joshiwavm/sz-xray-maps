@@ -5,8 +5,8 @@ import numpy as np
 from scipy.optimize import brentq
 from scipy.special import gamma
 from astropy import units as u
-from astropy.cosmology import Planck18 as cosmo
 
+from ..cosmology import cosmo
 from .conversions import ClusterPhysics
 
 

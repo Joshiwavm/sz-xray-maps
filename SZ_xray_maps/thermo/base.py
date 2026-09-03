@@ -3,8 +3,8 @@ from __future__ import annotations
 
 import numpy as np
 from astropy import units as u
-from astropy.cosmology import Planck18 as cosmo
 
+from ..cosmology import cosmo
 from .conversions import ClusterPhysics
 from .leff import LeffSolver
 from ..utils.spatial import circle_mask, radius_map_arcsec

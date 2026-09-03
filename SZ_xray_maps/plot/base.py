@@ -8,8 +8,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 from astropy import units as u
 from astropy.convolution import convolve, Gaussian2DKernel
-from astropy.cosmology import Planck18 as cosmo
 
+from ..cosmology import cosmo
 from .maps import (
     add_colorbar, add_label_box, add_r500_circle,
     add_beam_patch, configure_wcs_ticks, hide_spines,
@@ -41,6 +41,13 @@ class Plotter:
         "snr_T_e":       ("viridis", 1.0,  r"SNR $k_{\rm b}\bar{T}_e$",   0.0, 5),
         "snr_K_e":       ("viridis", 1.0,  r"SNR $\bar{K}_e$",   0.0, 5),
     }
+
+    # r500,c circle fractions to draw per quantity in plot_thermo_grid.
+    # Quantities not listed here fall back to _DEFAULT_R500_FRACS.
+    _R500_CIRCLE_FRACS: dict[str, list[float]] = {
+        "T_e": [0.1, 0.7, 1.0],
+    }
+    _DEFAULT_R500_FRACS: list[float] = [1.0]
 
     def __init__(self) -> None:
         setup_style()
@@ -223,8 +230,15 @@ class Plotter:
         snr_mask_threshold: float = -4.0,
         figsize: tuple | None = None,
         save_path: str | None = None,
+        r500_fracs: dict[str, list[float]] | None = None,
     ) -> tuple:
-        """Plot thermodynamical maps for one or more X-ray instruments."""
+        """Plot thermodynamical maps for one or more X-ray instruments.
+
+        r500_fracs: maps a panel quantity (e.g. "T_e") to a list of r500,c
+        fractions to draw as circles on that panel. Defaults to
+        `_R500_CIRCLE_FRACS`; quantities not listed there just get r500,c.
+        """
+        r500_fracs = r500_fracs or self._R500_CIRCLE_FRACS
         xray_labels    = xray_labels or list(self.thermo.keys())
         contour_levels = contour_levels or list(np.arange(-52, 0, 8))
         snr_contour_levels = snr_contour_levels or [1.5, 2.5, 3.5, 4.5, 5.5]
@@ -259,7 +273,10 @@ class Plotter:
                 ax.contour(convolve(snr_data, Gaussian2DKernel(1)), levels=snr_contour_levels,
                            colors="white", linewidths=0.5, linestyles="-", alpha = 0.5)
 
-            add_r500_circle(ax, cx_peak, cy_peak, theta500)
+            fracs = r500_fracs.get(panel.get("quantity"), self._DEFAULT_R500_FRACS)
+            for frac in fracs:
+                add_r500_circle(ax, cx_peak, cy_peak, theta500, frac=frac,
+                                show_label=(frac == max(fracs)))
             add_colorbar(fig, img, ax, panel["cbar_label"])
             configure_wcs_ticks(ax, size=9, show_ra=(row == nrows - 1), show_dec=(col == 0))
             if col == 0:
@@ -337,6 +354,7 @@ class Plotter:
             return dict(
                 data=data, cmap=self._resolve_cmap(self._PANEL_CONFIGS[quantity][0]),
                 cbar_label=cbar_label, vmin=vmin, vmax=vmax, label=label,
+                quantity=quantity,
             )
 
         th0 = self.thermo[xray_labels[0]]
