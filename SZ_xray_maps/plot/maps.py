@@ -26,14 +26,20 @@ def add_label_box(ax, text: str, fontsize: int = 10) -> None:
             verticalalignment="top", bbox=_LABEL_BOX)
 
 
-def add_r500_circle(ax, cx: float, cy: float, theta500: u.Quantity) -> None:
-    """Overlay an r500 circle and label on a WCS axis."""
+def add_r500_circle(ax, cx: float, cy: float, theta500: u.Quantity,
+                    frac: float = 1.0, label: str | None = None,
+                    show_label: bool = True) -> None:
+    """Overlay an r500 (or fraction thereof) circle, optionally labelled."""
     pixscale = abs(ax.wcs.pixel_scale_matrix[1, 1]) * u.deg
-    r_pix = (theta500.to(u.deg) / pixscale).value
+    r_pix = (theta500.to(u.deg) / pixscale).value * frac
     ax.add_patch(Circle((cx, cy), r_pix, ec="k", fc="none", ls="--"))
+    if not show_label:
+        return
+    if label is None:
+        label = r"r$_{500,c}$" if frac == 1.0 else rf"{frac:g}\,r$_{{500,c}}$"
     ax.text(
         cx + 0.65 * r_pix, cy - 0.65 * r_pix,
-        r"r$_{500,c}$", color="k",
+        label, color="k",
         rotation=45, ha="center", va="center",
     )
 
