@@ -92,7 +92,7 @@ class Plotter:
         plabels = None if panel_labels is None else np.atleast_2d(np.asarray(panel_labels))
 
         if contour_levels is None:
-            contour_levels = list(np.append(np.arange(-52, 0, 4), [-2, 2]))
+            contour_levels = list(np.arange(-30, 3, 4))
         snr_contour_levels = snr_contours if isinstance(snr_contours, list) else [1.5, 2.5, 3.5, 4.5, 5.5]
 
         if zoom_arcsec is not None:
@@ -240,7 +240,7 @@ class Plotter:
         """
         r500_fracs = r500_fracs or self._R500_CIRCLE_FRACS
         xray_labels    = xray_labels or list(self.thermo.keys())
-        contour_levels = contour_levels or list(np.arange(-52, 0, 8))
+        contour_levels = contour_levels or list(np.arange(-30, 0, 4))
         snr_contour_levels = snr_contour_levels or [1.5, 2.5, 3.5, 4.5, 5.5]
         # snr_contour_levels = snr_contour_levels or [1.0, 2.0, 3.0, 4.0, 5.0]
 
@@ -304,7 +304,7 @@ class Plotter:
     ) -> tuple:
         """Plot SNR maps in the same layout as ``plot_thermo_grid``."""
         xray_labels    = xray_labels or list(self.snr.keys())
-        contour_levels = contour_levels or list(np.arange(-52, 0, 8))
+        contour_levels = contour_levels or list(np.arange(-30, 0, 4))
 
         sz_entry     = self.sz_maps[sz_label]
         compton_y    = sz_entry["compton_y"]
