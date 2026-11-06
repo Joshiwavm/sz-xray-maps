@@ -40,3 +40,6 @@ plots/
 .vscode/
 .idea/
 *.swp
+
+# Claude Code
+CLAUDE.md
